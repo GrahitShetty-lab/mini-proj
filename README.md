@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/31601292/README.md)
 # 🛰️ Resilient Edge-Fusion Node
 ### Offline Multi-Sensor Emergency Alerting with False-Alarm Mitigation
 
@@ -162,38 +163,16 @@ This is the end-to-end checklist for taking the project from "code in GitHub" + 
 ```
 resilient-edge-fusion-node/
 ├── README.md
-├── firmware/           # MicroPython firmware for ESP32 + a CPython-compatible
-│                        # mock mode (lets the fusion logic run on a laptop)
-│   ├── main.py          # Sensor fusion + alert logic
-│   └── lora.py          # SX1276 driver
-├── gateway/             # SQLite-persisted receiver + HTTP API — the bridge
-│                        # between LoRa/simulated packets and the dashboard
-├── dashboard/           # Single-page web dashboard (reads the gateway's API)
-├── simulator/           # Realistic telemetry generator for demo/testing
-│                        # without any physical sensors attached
+├── firmware/
+│   ├── main.py            # Sensor fusion + alert logic
+│   └── lora.py            # SX1276 driver
 ├── docs/
-│   ├── HARDWARE.md       # Detailed hardware/wiring reference (see Section 13 prompt)
+│   ├── HARDWARE.md        # Detailed hardware/wiring reference (see Section 13 prompt)
 │   ├── wiring-diagram.png
-│   └── report.pdf        # Full design report
+│   └── report.pdf         # Full design report
 └── hardware/
     └── bom.csv
 ```
-
-### Two ways to run this project
-
-**Simulation mode (no hardware required)** — the `simulator/` feeds synthetic
-telemetry packets into the same `gateway/` interface a real LoRa receiver
-would use, so the `dashboard/` can be developed, demoed, and tested entirely
-on a laptop. This is what your teammates without a physical ESP32 setup
-should use.
-
-**Real hardware mode** — the ESP32 runs `firmware/main.py`, performing the
-same sensor-fusion logic described in [Section 6](#6-firmware-sensor-fusion-logic),
-and broadcasts over the SX1276 LoRa module. The LoRa interface is
-deliberately isolated behind a simple wrapper (`lora.py`) so it can be
-swapped for the real driver without touching the fusion/control logic —
-which is exactly what makes simulation and real-hardware mode share the
-same `gateway/`/`dashboard/` code.
 
 ## 11. Contributing (For Teammates)
 

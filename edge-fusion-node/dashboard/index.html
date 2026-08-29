@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edge Fusion Dashboard</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #101827; color: #edf2ff; }
+      .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+      .card { background: #1e293b; border-radius: 12px; padding: 16px; box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
+      .status.normal { color: #34d399; }
+      .status.warning { color: #fbbf24; }
+      .status.critical { color: #f87171; }
+      .row { display: flex; justify-content: space-between; margin: 8px 0; }
+      canvas { width: 100%; height: 220px; background: #0f172a; border-radius: 10px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 8px; border-bottom: 1px solid #334155; text-align: left; }
+      .badge { padding: 4px 10px; border-radius: 999px; font-weight: bold; }
+      .normal { background: rgba(52,211,153,.15); color: #34d399; }
+      .warning { background: rgba(251,191,36,.15); color: #fbbf24; }
+      .critical { background: rgba(248,113,113,.15); color: #f87171; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Resilient Edge-Fusion Dashboard</h1>
+      <div id="cards" class="grid"></div>
+      <div class="card" style="margin-top: 20px;">
+        <h2>Fusion score trend</h2>
+        <canvas id="chart" width="1100" height="220"></canvas>
+      </div>
+      <div class="card" style="margin-top: 20px;">
+        <h2>Alert log</h2>
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Node</th><th>Temp</th><th>Gas</th><th>Score</th><th>Level</th></tr>
+          </thead>
+          <tbody id="logTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const state = { nodes: {}, history: [] };
+      const cardContainer = document.getElementById('cards');
+      const logTable = document.getElementById('logTable');
+      const canvas = document.getElementById('chart');
+      const ctx = canvas.getContext('2d');
+
+      function levelClass(level) {
+        return (level || 'NORMAL').toLowerCase();
+      }
+
+      function renderCards() {
+        const nodeIds = Object.keys(state.nodes);
+        cardContainer.innerHTML = nodeIds.map((nodeId) => {
+          const node = state.nodes[nodeId];
+          const statusClass = levelClass(node.level || 'NORMAL');
+          return `
+            <div class="card">
+              <div class="row"><strong>Node ${nodeId}</strong><span class="badge ${statusClass}">${node.level || 'NORMAL'}</span></div>
+              <div class="row"><span>Temp</span><span>${node.temperature ?? '--'}°C</span></div>
+              <div class="row"><span>Gas</span><span>${node.gas_raw ?? '--'}</span></div>
+              <div class="row"><span>Motion</span><span>${node.motion ? 'YES' : 'NO'}</span></div>
+              <div class="row"><span>Score</span><span>${node.score ?? '--'}%</span></div>
+              <div class="row"><span>Updated</span><span>${node.timestamp ? new Date(node.timestamp).toLocaleTimeString() : '--'}</span></div>
+            </div>
+          `;
+        }).join('') || '<div class="card">Waiting for telemetry...</div>';
+      }
+
+      function renderLog() {
+        const rows = state.history.slice(0, 20).reverse();
+        logTable.innerHTML = rows.map((row) => `
+          <tr>
+            <td>${new Date(row.timestamp).toLocaleTimeString()}</td>
+            <td>${row.node_id}</td>
+            <td>${row.temperature}</td>
+            <td>${row.gas_raw}</td>
+            <td>${row.score}</td>
+            <td><span class="badge ${levelClass(row.level)}">${row.level}</span></td>
+          </tr>
+        `).join('');
+      }
+
+      function drawChart() {
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(30, 10); ctx.lineTo(30, h - 20); ctx.lineTo(w - 10, h - 20); ctx.stroke();
+
+        const series = state.history.slice(-20).map((row) => Number(row.score) || 0);
+        if (!series.length) return;
+        const maxVal = 100;
+        const minVal = 0;
+        const stepX = (w - 40) / Math.max(series.length - 1, 1);
+        ctx.strokeStyle = '#60a5fa';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        series.forEach((value, idx) => {
+          const x = 30 + idx * stepX;
+          const y = h - 20 - ((value - minVal) / (maxVal - minVal || 1)) * (h - 40);
+          if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+
+      async function fetchData() {
+        try {
+          console.log('[dashboard] polling /latest');
+          const response = await fetch('/latest');
+          console.log('[dashboard] fetch status:', response.status, response.statusText);
+          const data = await response.json();
+          console.log('[dashboard] latest payload:', data);
+          const items = data.items || [];
+          if (items.length) {
+            items.forEach((item) => {
+              const nodeId = item.node_id;
+              state.nodes[nodeId] = item;
+              state.history.push(item);
+            });
+          } else {
+            console.log('[dashboard] no telemetry yet');
+          }
+          renderCards();
+          renderLog();
+          drawChart();
+        } catch (error) {
+          console.warn('[dashboard] Gateway not available yet:', error.message);
+        }
+      }
+
+      setInterval(fetchData, 1500);
+      fetchData();
+    </script>
+  </body>
+</html>

@@ -11,11 +11,30 @@ from typing import Any, Iterator
 
 from flask import Flask, jsonify, send_from_directory
 
+import tempfile
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import tempfile
+DASHBOARD_DIR = ROOT / "dashboard"
+
+
+def get_db_path() -> Path:
+    if os.environ.get("VERCEL"):
+        tmp_db = Path(tempfile.gettempdir()) / "data.db"
+        orig_db = Path(__file__).resolve().parent / "data.db"
+        if not tmp_db.exists() and orig_db.exists():
+            import shutil
+            try:
+                shutil.copyfile(orig_db, tmp_db)
+            except Exception:
+                pass
+        return tmp_db
+    return Path(__file__).resolve().parent / "data.db"
+
+
+DB_PATH = get_db_path()
 APP = Flask(__name__)
 
 
